@@ -292,12 +292,14 @@ class LoginScreen(CredentialManager):
             self.password.delete(0, 'end')
     
     def destroy_and_create_mainvault(self):
-        self.root.destroy()
-        import customtkinter as ctk
-        app = MainVault(ctk.CTk(), "All Items", "AllItems", "all_items")
+        self.cleanup_widgets()  # Clean up canvas elements
+        app = MainVault(self.root, "All Items", "AllItems", "all_items")
         app.run()
     
     def cleanup_widgets(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
         # Cleanup canvas elements if they exist
         if hasattr(self, 'heading1'):
             self.heading1.destroy()
@@ -672,7 +674,7 @@ class MainVault(CredentialManager):
         app.run()
 
     def run_random_password_generator(self):
-        app = RandomPasswordGenerator()
+        app = RandomPasswordGenerator(parent=self.root)
         app.run()
 
     def run_additional_information(self):
@@ -692,12 +694,17 @@ class RandomPasswordGenerator(CredentialManager):
         return cls._instance
     
     def __init__(self, parent=None):
-        super().__init__(None)
+        if hasattr(self, 'root'):  # Check if already initialized
+            return
         self.parent = parent
         self.root = ctk.CTk()
+        super().__init__(self.root)  # Pass the new root window to parent
         self.setup_window()
         self.create_widgets()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def is_master_password_present(self):
+        pass
 
     def setup_window(self):
         self.root.title("Random Password Generator")
