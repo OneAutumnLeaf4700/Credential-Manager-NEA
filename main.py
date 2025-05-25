@@ -565,7 +565,13 @@ class LoginScreen(CredentialManager):
         # Verify if the entered password matches the stored password
         match = self.get_master_password()
         if match:
-            self.root.after(100, self.destroy_and_create_mainvault)
+            # Create MainVault instance first
+            app = MainVault(parent=self.root)
+            app.initialize_right_frame("All Items", "AllItems", "all_items")
+            # Destroy the login screen window
+            self.root.destroy()
+            # Run the main vault
+            app.run()
         else:
             self.status_label.configure(text="Incorrect password. Please try again.")
             self.password.delete(0, 'end')
@@ -671,37 +677,27 @@ class MainVault(CredentialManager):
             print(f"Error refreshing theme: {e}")
     
     def edit_credential(self, record):
-        # Create a popup window for editing
-        edit_window = ctk.CTkToplevel(self.root)
-        edit_window.title("Edit Credential")
-        edit_window.geometry("400x300")
-        
-        # Create labels and entry fields
-        title_label = ctk.CTkLabel(
-            edit_window, 
-            text="Title:", 
-            font=subtitle_type,
-            text_color=text_color
-        )
-        title_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        
-        # Create username label with explicit styling
-        username_label = ctk.CTkLabel(
-            edit_window, 
-            text="Username:", 
-            font=subtitle_type,
-            text_color=text_color
-        )
-        username_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        
-        # Create password label with explicit styling
-        password_label = ctk.CTkLabel(
-            edit_window, 
-            text="Password:", 
-            font=subtitle_type,
-            text_color=text_color
-        )
-        password_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        """Open the edit credential window for the selected record."""
+        try:
+            # Determine which database and table to use based on current view
+            database = "AllItems" if self.window_title == "All Items" else "Favourites"
+            table = "all_items" if database == "AllItems" else "favourites"
+            
+            # Create and run the edit window
+            edit_window = EditCredential(
+                parent=self,
+                database=database,
+                table=table,
+                record=record
+            )
+            edit_window.run()
+            
+            # Refresh the credentials display after editing
+            self.load_credentials("website", database, table)
+            
+        except Exception as e:
+            print(f"Error opening edit window: {e}")
+            self.popup(self.root, f"Error opening edit window: {str(e)}")
 
     def clear_credentials(self):
         # Clear all widgets from the scrollable frame
@@ -2386,131 +2382,88 @@ def run_add_credentials(self):
 class EditCredential(CredentialManager):
     _instance = None
 
-    def __new__(cls, database, table, record):
+    def __new__(cls, parent, database, table, record):
         if cls._instance is not None:
             cls.popup(cls._instance.root, "Edit Credential window is already open")
             return cls._instance
         cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, database, table, record):
+    def __init__(self, parent, database, table, record):
         if hasattr(self, 'root'):
             return
         self.root = ctk.CTk()
         super().__init__(self.root)
+        self.parent = parent
         self.database = database
         self.table = table
+        self.record_id = record[0]  # Store the record ID
         self.previous_website = record[1]
         self.previous_username = record[2]
         self.previous_password = record[3]
         self.setup_window()
         self.create_widgets()
-        self.assign_values()
+        self.assign_values()  # Call this after creating widgets
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    def setup_window(self):
-        self.root.title("Edit A Credential")
-        self.root.attributes('-topmost', True)
-        root_width = 600
-        root_height = 400
-        self.root.geometry(f"{root_width}x{root_height}")
-        self.root.resizable(False, False)
-
-    def create_widgets(self):
-        heading1 = ctk.CTkLabel(self.root, text="Website:", **self.label_style)
-        heading1.pack(pady=(20, 10))
-        self.website_entry = ctk.CTkEntry(self.root, width=300, **self.entry_style)
-        self.website_entry.pack(pady=(0, 10))
-        heading2 = ctk.CTkLabel(self.root, text="Username:", **self.label_style)
-        heading2.pack(pady=(20, 10))
-        self.username_entry = ctk.CTkEntry(self.root, width=300, **self.entry_style)
-        self.username_entry.pack(pady=(0, 10))
-        heading3 = ctk.CTkLabel(self.root, text="Password:", **self.label_style)
-        heading3.pack(pady=(20, 10))
-        self.password_entry = ctk.CTkEntry(self.root, width=300, **self.entry_style)
-        self.password_entry.pack(pady=(0, 10))
-        add_button = ctk.CTkButton(self.root, text="Apply", width=200,
-                                   command=self.apply_values, **self.button_style)
-        add_button.pack(pady=(20, 10))
-
-    def is_master_password_present(self):
-        pass
-
     def assign_values(self):
-        # Get the website from the entry
-        website = self.previous_website
-        username = self.previous_username
-        password = self.previous_password
-        print(website, username, password, self.decrypt_password(password))
-        # Connect to the database and retrieve the credential details
-        with sqlite3.connect(f"D:/Credential Manager/test/PasswordManager/{self.database}.db") as db:
-            cursor = db.cursor()
-            cursor.execute(f"SELECT * FROM {self.table} WHERE website = ? AND username = ? AND password = ?", (website, username, password))
-            credential = cursor.fetchone()
-            if credential:
-                # Populate the text entries with the retrieved credential details
-                self.website_entry.delete(0, 'end')
-                self.website_entry.insert(0, credential[1])
-                self.username_entry.delete(0, 'end')
-                self.username_entry.insert(0, credential[2])
-                # Decrypt the password and insert it into the password entry
-                decrypted_password = self.decrypt_password(credential[3]) # Assuming password is the third column
-                self.password_entry.delete(0, 'end')
+        try:
+            # Populate the entries with the current values
+            self.website_entry.delete(0, 'end')
+            self.website_entry.insert(0, self.previous_website)
+            
+            self.username_entry.delete(0, 'end')
+            self.username_entry.insert(0, self.previous_username)
+            
+            self.password_entry.delete(0, 'end')
+            try:
+                decrypted_password = self.decrypt_password(self.previous_password)
                 self.password_entry.insert(0, decrypted_password)
-            else:
-                # If credential not found, show an error message
-                self.popup(self.root, f"No credential found for website: {website}")
+            except Exception as e:
+                print(f"Error decrypting password: {e}")
+                self.status_label.configure(text="Error loading password")
+            
+        except Exception as e:
+            print(f"Error in assign_values: {e}")
+            self.status_label.configure(text=f"Error loading credential: {str(e)}")
 
     def apply_values(self):
-        # Get the updated values from the text entries
-        new_website = self.website_entry.get()
-        new_username = self.username_entry.get()
+        # Get the updated values
+        new_website = self.website_entry.get().strip()
+        new_username = self.username_entry.get().strip()
         new_password = self.password_entry.get()
-        # Check if any of the fields are empty
-        if not all((new_website, new_username, new_password)):
-            # If any field is empty, show an error message and return
-            self.popup(self.root, "Please fill in all fields.")
+        
+        # Validate inputs
+        if not all([new_website, new_username, new_password]):
+            self.status_label.configure(text="Please fill in all fields")
             return
-        # Check if the values have actually changed
-        if new_website != self.previous_website or new_username != self.previous_username or new_password != self.previous_password:
-            # Check to see if the credential exists
-            with sqlite3.connect(f"D:/Credential Manager/test/PasswordManager/{self.database}.db") as db:
+        
+        try:
+            # Encrypt the new password
+            encrypted_password = self.encrypt_password(new_password)
+            
+            # Update the database using the record ID
+            db_path = ALL_ITEMS_DB if self.database == "AllItems" else FAVOURITES_DB
+            with sqlite3.connect(db_path) as db:
                 cursor = db.cursor()
-                cursor.execute(f"SELECT * FROM {self.table} WHERE website = ? AND username = ?", (self.previous_website, self.previous_username))
-                credential = cursor.fetchone()
-                if credential:
-                    # Update the database with the new values
-                    update_query = f"UPDATE {self.table} SET website = ?, username = ?, password = ? WHERE website = ? AND username = ? AND password = ?"
-                    encrypted_password = self.encrypt_password(new_password)
-                    with sqlite3.connect(f"D:/Credential Manager/test/PasswordManager/{self.database}.db") as db:
-                        cursor = db.cursor()
-                        cursor.execute(update_query, (new_website, new_username,
-                        encrypted_password, self.previous_website, self.previous_username,
-                        self.previous_password))
-                    db.commit()
-                    self.root.after(100, self.destroy_window_and_create_main_vault)
-                else:
-                    # If credential not found, show an error message
-                    self.popup(self.root, f"No credential found for website: {self.previous_website} and username: {self.previous_username}")
-        else:
-            # No changes were made, so inform the user
-            self.popup(self.root, "No changes made.")
-
-    def destroy_window_and_create_main_vault(self):
-        self.popup(self.root, "Change Successfull")
-        EditCredential._instance = None
-        self.root.destroy()
-        """EditCredential._instance = None
-        if self.database == "AllItems":
-            self.root.destroy()
-            app = MainVault(root, "All Items", "AllItems", "all_items")
-        else:
-            self.root.destroy()
-            app = MainVault(root, "Favourites", "Favourites", "Favourites")
-        app.run()"""
+                cursor.execute(f"""
+                    UPDATE {self.table}
+                    SET website = ?, username = ?, password = ?
+                    WHERE id = ?
+                """, (new_website, new_username, encrypted_password, self.record_id))
+                db.commit()
+            
+            self.status_label.configure(text="Changes saved successfully!", text_color="green")
+            self.root.after(1000, self.on_close)
+            
+        except Exception as e:
+            print(f"Error in apply_values: {e}")
+            self.status_label.configure(text=f"Error saving changes: {str(e)}")
 
     def on_close(self):
         EditCredential._instance = None
+        if self.parent and hasattr(self.parent, 'refresh_theme'):
+            self.parent.refresh_theme()  # Refresh parent window
         self.root.destroy()
 
     def run(self):
