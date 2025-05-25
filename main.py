@@ -392,35 +392,95 @@ class MainVault(CredentialManager):
         # Calculate offset for pagination
         offset = (self.current_page - 1) * self.items_per_page
         
-        # Fetch credentials from database with pagination
-        with sqlite3.connect(db_path) as db:
-            cursor = db.cursor()
-            cursor.execute(f"SELECT * FROM {table} ORDER BY {sort_by} LIMIT {self.items_per_page} OFFSET {offset}")
-            rows = cursor.fetchall()
-            
-            # Create a frame for each credential
-            for row in rows:
-                frame = ctk.CTkFrame(self.scrollable_frame)
-                frame.pack(fill="x", padx=10, pady=5)
+        try:
+            # Fetch credentials from database with pagination
+            with sqlite3.connect(db_path) as db:
+                cursor = db.cursor()
+                cursor.execute(f"SELECT * FROM {table} ORDER BY {sort_by} LIMIT {self.items_per_page} OFFSET {offset}")
+                rows = cursor.fetchall()
                 
-                # Create labels for each field
-                for col, value in enumerate(row):
-                    if col == 0:  # Skip ID column
-                        continue
-                    label = ctk.CTkLabel(frame, text=str(value), **self.label_style)
-                    label.pack(side="left", padx=5)
-                
-                # Create edit and delete buttons
-                edit_button = ctk.CTkButton(frame, text="Edit", command=lambda r=row: self.edit_credential(r), **self.button_style)
-                edit_button.pack(side="right", padx=5)
-                
-                delete_button = ctk.CTkButton(frame, text="Delete", command=lambda r=row: self.delete_record(r[0], database, table), **self.button_style)
-                delete_button.pack(side="right", padx=5)
-                
-                if database == "AllItems":
-                    favorite_button = ctk.CTkButton(frame, text="Favorite", command=lambda r=row: self.favorite_record(r), **self.button_style)
-                    favorite_button.pack(side="right", padx=5)
-    
+                # Create a frame for each credential
+                for row_idx, row in enumerate(rows):
+                    # Create a frame for each row with alternating background
+                    frame = ctk.CTkFrame(
+                        self.scrollable_frame,
+                        fg_color="#242424" if row_idx % 2 == 0 else "#1a1a1a"
+                    )
+                    frame.grid(row=row_idx, column=0, columnspan=4, sticky="ew", padx=0, pady=1)
+                    frame.grid_columnconfigure(0, weight=2)  # Website
+                    frame.grid_columnconfigure(1, weight=2)  # Username
+                    frame.grid_columnconfigure(2, weight=1)  # Password
+                    frame.grid_columnconfigure(3, weight=1)  # Actions
+                    
+                    # Add website
+                    website_label = ctk.CTkLabel(
+                        frame,
+                        text=row[1],  # Website
+                        font=text_type,
+                        text_color=text_color
+                    )
+                    website_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+                    
+                    # Add username
+                    username_label = ctk.CTkLabel(
+                        frame,
+                        text=row[2],  # Username
+                        font=text_type,
+                        text_color=text_color
+                    )
+                    username_label.grid(row=0, column=1, padx=20, pady=10, sticky="w")
+                    
+                    # Add password (masked)
+                    password_label = ctk.CTkLabel(
+                        frame,
+                        text="••••••••",
+                        font=text_type,
+                        text_color=text_color
+                    )
+                    password_label.grid(row=0, column=2, padx=20, pady=10, sticky="w")
+                    
+                    # Create actions frame
+                    actions_frame = ctk.CTkFrame(frame, fg_color="transparent")
+                    actions_frame.grid(row=0, column=3, padx=20, pady=10, sticky="e")
+                    
+                    # Add action buttons
+                    edit_button = ctk.CTkButton(
+                        actions_frame,
+                        text="Edit",
+                        width=60,
+                        command=lambda r=row: self.edit_credential(r),
+                        font=text_type,
+                        fg_color=button_fg_color,
+                        text_color=text_color
+                    )
+                    edit_button.pack(side="left", padx=5)
+                    
+                    delete_button = ctk.CTkButton(
+                        actions_frame,
+                        text="Delete",
+                        width=60,
+                        command=lambda r=row: self.delete_record(r[0], database, table),
+                        font=text_type,
+                        fg_color=button_fg_color,
+                        text_color=text_color
+                    )
+                    delete_button.pack(side="left", padx=5)
+                    
+                    if database == "AllItems":
+                        favorite_button = ctk.CTkButton(
+                            actions_frame,
+                            text="★",
+                            width=40,
+                            command=lambda r=row: self.favorite_record(r),
+                            font=text_type,
+                            fg_color=button_fg_color,
+                            text_color=text_color
+                        )
+                        favorite_button.pack(side="left", padx=5)
+        
+        except Exception as e:
+            self.popup(self.root, f"Error loading credentials: {str(e)}")
+
     def favorite_record(self, record_array):
         # Add record to favorites database
         with sqlite3.connect(FAVOURITES_DB) as db:
@@ -520,47 +580,109 @@ class MainVault(CredentialManager):
         self.right_frame_height = self.root_height
         self.window_title = window_title
 
-        # Initialize the right frame
-        self.right_frame = ctk.CTkFrame(self.root, width=self.right_frame_width, height=self.right_frame_height)
+        # Initialize the right frame with a consistent background color
+        self.right_frame = ctk.CTkFrame(self.root, width=self.right_frame_width, height=self.right_frame_height,
+                                      fg_color="#1a1a1a")  # Slightly lighter than left frame
         self.right_frame.grid(row=0, column=1, sticky="nsew")
         self.right_frame.grid_propagate(False)
         
         # Configure grid for right frame
-        self.right_frame.columnconfigure(0, weight=1)
-        self.right_frame.rowconfigure(0, weight=0)
-        self.right_frame.rowconfigure(1, weight=0)
-        self.right_frame.rowconfigure(2, weight=1)
+        self.right_frame.columnconfigure(0, weight=1)  # Make first column expandable
+        self.right_frame.rowconfigure(2, weight=1)     # Make the scrollable area expandable
+        
+        # Create a header frame for title and search
+        header_frame = ctk.CTkFrame(self.right_frame, fg_color="transparent")
+        header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
+        header_frame.columnconfigure(1, weight=1)  # Make search bar expandable
         
         # Create title label with explicit styling
         self.title_label = ctk.CTkLabel(
-            self.right_frame, 
+            header_frame, 
             text=window_title,
             font=title_type,
             text_color=text_color,
-            fg_color="transparent"  # Make background transparent
+            fg_color="transparent"
         )
-        self.title_label.grid(row=0, column=0, sticky="w", padx=20, pady=10)
+        self.title_label.grid(row=0, column=0, sticky="w")
         
-        # Set other labels as needed
-        website_label = ctk.CTkButton(self.right_frame, text="Website", font=subtitle_type,
-                                      fg_color="transparent",
-                                      border_width=None, border_color="Transparent",
-                                      text_color=text_color,
-                                      command=lambda: self.load_credentials("website", database, table))
-        website_label.grid(row=1, column=0, padx=10, pady=30)
-
-        username_label = ctk.CTkButton(self.right_frame, text="Username", font=subtitle_type,
-                                       fg_color="transparent",
-                                       border_width=None, border_color="Transparent",
-                                       text_color=text_color,
-                                       command=lambda: self.load_credentials("username", database, table))
-        username_label.grid(row=1, column=1, padx=30)
-
-        password_label = ctk.CTkLabel(self.right_frame, text="Password", font=subtitle_type, text_color=text_color)
-        password_label.grid(row=1, column=2, padx=30)
-
-        self.initialize_search_frame(database, table)
+        # Create search frame in header
+        search_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        search_frame.grid(row=0, column=1, sticky="e")
+        
+        # Add search bar and button
+        self.search_bar = ctk.CTkEntry(
+            search_frame,
+            width=300,
+            placeholder_text="Search...",
+            font=text_type,
+            text_color=text_color,
+            fg_color=txt_entry_fg_color
+        )
+        self.search_bar.grid(row=0, column=0, padx=(0, 10))
+        
+        search_button = ctk.CTkButton(
+            search_frame,
+            text="Search",
+            width=100,
+            command=lambda: self.load_credentials(self.search_bar.get(), database, table),
+            font=text_type,
+            fg_color=button_fg_color,
+            text_color=text_color
+        )
+        search_button.grid(row=0, column=1)
+        
+        # Create a header bar for column titles
+        header_bar = ctk.CTkFrame(self.right_frame, fg_color="#242424", height=40)  # Slightly lighter than background
+        header_bar.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 10))
+        header_bar.grid_propagate(False)
+        
+        # Configure header bar columns
+        header_bar.columnconfigure(0, weight=2)  # Website column wider
+        header_bar.columnconfigure(1, weight=2)  # Username column wider
+        header_bar.columnconfigure(2, weight=1)  # Password column
+        header_bar.columnconfigure(3, weight=1)  # Actions column
+        
+        # Add column headers with consistent styling
+        header_style = {"font": subtitle_type, "text_color": text_color}
+        
+        website_header = ctk.CTkButton(
+            header_bar,
+            text="Website",
+            fg_color="transparent",
+            border_width=0,
+            command=lambda: self.load_credentials("website", database, table),
+            **header_style
+        )
+        website_header.grid(row=0, column=0, padx=20, sticky="w")
+        
+        username_header = ctk.CTkButton(
+            header_bar,
+            text="Username",
+            fg_color="transparent",
+            border_width=0,
+            command=lambda: self.load_credentials("username", database, table),
+            **header_style
+        )
+        username_header.grid(row=0, column=1, padx=20, sticky="w")
+        
+        password_header = ctk.CTkLabel(
+            header_bar,
+            text="Password",
+            **header_style
+        )
+        password_header.grid(row=0, column=2, padx=20, sticky="w")
+        
+        actions_header = ctk.CTkLabel(
+            header_bar,
+            text="Actions",
+            **header_style
+        )
+        actions_header.grid(row=0, column=3, padx=20, sticky="w")
+        
+        # Initialize the scrollable frame for credentials
         self.initialize_scrollable_frame(database, table)
+        
+        # Initialize pagination controls
         self.initialize_lifted_widgets(database, table)
 
     def initialize_search_frame(self, database, table):
@@ -584,54 +706,82 @@ class MainVault(CredentialManager):
         search_button.grid(row=0, column=1, padx=5)
 
     def initialize_scrollable_frame(self, database, table):
-        # Create a canvas to hold the scrollable frame
-        self.canvas = ctk.CTkCanvas(self.right_frame, width=self.right_frame_width - 20,
-                                  height=self.right_frame_height - 200,
-                                  bg="#242424", highlightthickness=0)
-        self.canvas.grid(row=2, column=0, columnspan=4, sticky="nsew", padx=10)
-
-        # Create a frame inside the canvas to hold the credentials
-        self.scrollable_frame = ctk.CTkFrame(self.canvas)
-        self.scrollable_frame.grid(row=0, column=0, sticky="nsew")
-
-        # Create a scrollbar and associate it with the canvas
-        self.scrollbar = ctk.CTkScrollbar(self.right_frame, orientation="vertical",
-                                        command=self.canvas.yview)
-        self.scrollbar.grid(row=2, column=4, sticky="ns")
+        # Create a container frame for the scrollable area
+        scroll_container = ctk.CTkFrame(self.right_frame, fg_color="transparent")
+        scroll_container.grid(row=2, column=0, sticky="nsew", padx=20)
+        scroll_container.grid_columnconfigure(0, weight=1)
+        scroll_container.grid_rowconfigure(0, weight=1)
+        
+        # Create a canvas with scrollbar
+        self.canvas = ctk.CTkCanvas(
+            scroll_container,
+            bg="#1a1a1a",
+            highlightthickness=0
+        )
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        
+        # Create scrollbar
+        self.scrollbar = ctk.CTkScrollbar(
+            scroll_container,
+            orientation="vertical",
+            command=self.canvas.yview
+        )
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
+        
+        # Configure canvas
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        # Bind the scrollable frame to the canvas
-        self.canvas_frame = self.canvas.create_window((0, 0),
-                                                    window=self.scrollable_frame,
-                                                    anchor="nw")
-
-        # Configure grid weights
-        self.scrollable_frame.grid_columnconfigure(0, weight=1)
-        self.right_frame.grid_columnconfigure(0, weight=1)
-
-        # Bind events for proper scrolling behavior
-        self.scrollable_frame.bind("<Configure>",
-                                 lambda e: self.canvas.configure(
-                                     scrollregion=self.canvas.bbox("all")))
+        
+        # Create scrollable frame
+        self.scrollable_frame = ctk.CTkFrame(self.canvas, fg_color="transparent")
+        self.canvas_frame = self.canvas.create_window(
+            (0, 0),
+            window=self.scrollable_frame,
+            anchor="nw",
+            width=self.canvas.winfo_reqwidth()
+        )
+        
+        # Configure grid weights for scrollable frame
+        self.scrollable_frame.grid_columnconfigure(0, weight=2)  # Website
+        self.scrollable_frame.grid_columnconfigure(1, weight=2)  # Username
+        self.scrollable_frame.grid_columnconfigure(2, weight=1)  # Password
+        self.scrollable_frame.grid_columnconfigure(3, weight=1)  # Actions
+        
+        # Bind events
+        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", self.on_canvas_configure)
         self.canvas.bind_all("<MouseWheel>", self.on_mousewheel)
-
-        # Load credentials into the scrollable frame
+        
+        # Load initial credentials
         self.load_credentials("website", database, table)
 
     def initialize_lifted_widgets(self, database, table):
         # Create a frame for pagination controls
         pagination_frame = ctk.CTkFrame(self.right_frame, fg_color="transparent")
-        pagination_frame.grid(row=3, column=0, columnspan=4, pady=10)
-
-        # Add pagination buttons
-        prev_button = ctk.CTkButton(pagination_frame, text="Previous",
-                                  command=lambda: self.change_page(-1, database, table))
-        prev_button.grid(row=0, column=0, padx=5)
-
-        next_button = ctk.CTkButton(pagination_frame, text="Next",
-                                  command=lambda: self.change_page(1, database, table))
-        next_button.grid(row=0, column=1, padx=5)
+        pagination_frame.grid(row=3, column=0, sticky="ew", padx=20, pady=10)
+        
+        # Add pagination buttons with consistent styling
+        button_style = {
+            "font": text_type,
+            "fg_color": button_fg_color,
+            "text_color": text_color,
+            "width": 100
+        }
+        
+        prev_button = ctk.CTkButton(
+            pagination_frame,
+            text="Previous",
+            command=lambda: self.change_page(-1, database, table),
+            **button_style
+        )
+        prev_button.pack(side="left", padx=5)
+        
+        next_button = ctk.CTkButton(
+            pagination_frame,
+            text="Next",
+            command=lambda: self.change_page(1, database, table),
+            **button_style
+        )
+        next_button.pack(side="left", padx=5)
 
     def on_canvas_configure(self, event):
         # Update the scroll region to encompass the inner frame
@@ -666,7 +816,7 @@ class MainVault(CredentialManager):
         app.run()
 
     def run_settings(self):
-        app = Settings()
+        app = Settings(parent=self.root)
         app.run()
 
     def run_filemanager(self):
@@ -816,15 +966,21 @@ class Settings(CredentialManager):
         return cls._instance
     
     def __init__(self, parent=None):
-        super().__init__(None)
+        if hasattr(self, 'root'):  # Check if already initialized
+            return
         self.parent = parent
         self.root = ctk.CTk()
+        super().__init__(self.root)  # Pass the new root window to parent
         self.setup_window()
         self.create_widgets()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
+    def is_master_password_present(self):
+        pass
+
     def setup_window(self):
         self.root.title("Settings")
+        self.root.attributes('-topmost', True)  # Make window stay on top
         root_width = 700
         root_height = 350
         self.root.geometry(f"{root_width}x{root_height}")
@@ -835,108 +991,123 @@ class Settings(CredentialManager):
                        button_border_width, "border_color": button_border_color, "text_color": text_color}
         radio_button_style = {"fg_color": button_fg_color}
         label_style = {"font": title_type, "text_color": text_color, "fg_color": title_fg_color}
+        
+        # Create a main frame to hold all widgets
+        main_frame = ctk.CTkFrame(self.root)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
         # Theme Widgets
-        theme_label = ctk.CTkLabel(self.root, text="Theme:", **label_style)
+        theme_label = ctk.CTkLabel(main_frame, text="Theme:", **label_style)
         theme_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
         self.theme_var = StringVar()
         self.theme_var.set(user_settings["theme"])
-        theme_button = ctk.CTkRadioButton(self.root, text="Automatic",
+        theme_button = ctk.CTkRadioButton(main_frame, text="Automatic",
                                         variable=self.theme_var, value="system",
                                         command=None, **radio_button_style)
         theme_button.grid(row=0, column=1, padx=20, pady=10, sticky="w")
-        theme_button = ctk.CTkRadioButton(self.root, text="Light",
+        theme_button = ctk.CTkRadioButton(main_frame, text="Light",
                                         variable=self.theme_var, value="light",
                                         command=None, **radio_button_style)
         theme_button.grid(row=0, column=2, padx=20, pady=10, sticky="w")
-        theme_button = ctk.CTkRadioButton(self.root, text="Dark",
+        theme_button = ctk.CTkRadioButton(main_frame, text="Dark",
                                         variable=self.theme_var, value="dark",
                                         command=None, **radio_button_style)
         theme_button.grid(row=0, column=3, padx=20, pady=10, sticky="w")
+        
         # Widget Theme Options
-        widget_theme_label = ctk.CTkLabel(self.root, text="Widget Theme:", **label_style)
+        widget_theme_label = ctk.CTkLabel(main_frame, text="Widget Theme:", **label_style)
         widget_theme_label.grid(row=1, column=0, padx=20, pady=10, sticky="w")
         self.widget_theme_var = StringVar()
         self.widget_theme_var.set(user_settings["widget_theme"])
-        widget_theme_button = ctk.CTkRadioButton(self.root, text="Blue",
+        widget_theme_button = ctk.CTkRadioButton(main_frame, text="Blue",
                                                 variable=self.widget_theme_var, value="blue",
                                                 command=None, **radio_button_style)
         widget_theme_button.grid(row=1, column=1, padx=20, pady=10, sticky="w")
-        widget_theme_button = ctk.CTkRadioButton(self.root, text="Dark Blue",
+        widget_theme_button = ctk.CTkRadioButton(main_frame, text="Dark Blue",
                                                 variable=self.widget_theme_var, value="dark-blue",
                                                 command=None, **radio_button_style)
         widget_theme_button.grid(row=1, column=2, padx=20, pady=10, sticky="w")
-        widget_theme_button = ctk.CTkRadioButton(self.root, text="Green",
+        widget_theme_button = ctk.CTkRadioButton(main_frame, text="Green",
                                                 variable=self.widget_theme_var, value="green",
                                                 command=None, **radio_button_style)
         widget_theme_button.grid(row=1, column=3, padx=20, pady=10, sticky="w")
+        
         # Text Size Option
-        text_size_label = ctk.CTkLabel(self.root, text="Text Size:", **label_style)
+        text_size_label = ctk.CTkLabel(main_frame, text="Text Size:", **label_style)
         text_size_label.grid(row=2, column=0, padx=20, pady=10, sticky="w")
         self.text_size_var = IntVar()
         self.text_size_var.set(user_settings["text_size"])
-        text_size_btn = ctk.CTkRadioButton(self.root, text="Small",
+        text_size_btn = ctk.CTkRadioButton(main_frame, text="Small",
                                            variable=self.text_size_var, value=14,
                                            command=None, **radio_button_style)
         text_size_btn.grid(row=2, column=1, columnspan=2, padx=20, pady=10, sticky="w")
-        text_size_btn = ctk.CTkRadioButton(self.root, text="Medium",
+        text_size_btn = ctk.CTkRadioButton(main_frame, text="Medium",
                                            variable=self.text_size_var, value=16,
                                            command=None, **radio_button_style)
         text_size_btn.grid(row=2, column=2, columnspan=2, padx=20, pady=10, sticky="w")
-        text_size_btn = ctk.CTkRadioButton(self.root, text="Large",
+        text_size_btn = ctk.CTkRadioButton(main_frame, text="Large",
                                            variable=self.text_size_var, value=18,
                                            command=None, **radio_button_style)
         text_size_btn.grid(row=2, column=3, columnspan=2, padx=20, pady=10, sticky="w")
+        
         # Text Color Option
-        text_color_label = ctk.CTkLabel(self.root, text="Text Color:", **label_style)
+        text_color_label = ctk.CTkLabel(main_frame, text="Text Color:", **label_style)
         text_color_label.grid(row=3, column=0, padx=20, pady=10, sticky="w")
         self.text_color_var = StringVar()
         self.text_color_var.set(user_settings["text_color"])
-        text_color_options = ctk.CTkOptionMenu(self.root, values=["White", "Black", "Grey"],
+        text_color_options = ctk.CTkOptionMenu(main_frame, values=["White", "Black", "Grey"],
                                                command=None,
-                                               variable=self.text_color_var, fg_color = button_fg_color)
-        text_color_options.grid(row=3, column=1, columnspan=2, padx=20, pady=10,
-                               sticky="w")
+                                               variable=self.text_color_var, fg_color=button_fg_color)
+        text_color_options.grid(row=3, column=1, columnspan=2, padx=20, pady=10, sticky="w")
+        
         # Font Family Option
-        font_family_label = ctk.CTkLabel(self.root, text="Font Family:", **label_style)
+        font_family_label = ctk.CTkLabel(main_frame, text="Font Family:", **label_style)
         font_family_label.grid(row=4, column=0, padx=20, pady=10, sticky="w")
         self.font_family_var = StringVar()
         self.font_family_var.set(user_settings["font_family"])
         font_family_options = ctk.CTkOptionMenu(
-            self.root,
+            main_frame,
             values=["Arial", "IMPACT", "Times New Roman"],
             command=None,
             variable=self.font_family_var,
             fg_color=button_fg_color
         )
         font_family_options.grid(row=4, column=1, columnspan=2, padx=20, pady=10, sticky="w")
+        
         # Apply Button
-        apply_button = ctk.CTkButton(self.root, text="Apply Settings",
+        apply_button = ctk.CTkButton(main_frame, text="Apply Settings",
                                     command=self.apply_settings, **button_style)
         apply_button.grid(row=5, column=1, columnspan=2, padx=20, pady=10)
 
     def apply_settings(self):
-        # Getting Theme
-        self.current_theme = self.theme_var.get()
-        # Getting Widget theme
-        self.current_widget_theme = self.widget_theme_var.get()
-        # Getting the text size
-        self.current_text_size = self.text_size_var.get()
-        # Getting the text color
-        self.current_text_color = self.text_color_var.get()
-        # Getting the font type
-        self.current_font_family = self.font_family_var.get()
-        # Connecting to the UserSettings Database
-        with sqlite3.connect("D:/Credential Manager/test/Password Manager/UserSettings.db") as db:
-            cursor = db.cursor()
-            # Update the settings in the database
-            self.update_database(cursor, db)
-            # Fetch and print the updated values
-            cursor.execute("SELECT * FROM settings WHERE id = 1;")
-            updated_values = cursor.fetchone()
-            # Update the user_settings dictionary
-            self.update_user_settings(updated_values)
-        self.refresh_ui()
-        self.on_close()
+        try:
+            # Getting Theme
+            self.current_theme = self.theme_var.get()
+            # Getting Widget theme
+            self.current_widget_theme = self.widget_theme_var.get()
+            # Getting the text size
+            self.current_text_size = self.text_size_var.get()
+            # Getting the text color
+            self.current_text_color = self.text_color_var.get()
+            # Getting the font type
+            self.current_font_family = self.font_family_var.get()
+            
+            # Connecting to the UserSettings Database
+            with sqlite3.connect("UserSettings.db") as db:
+                cursor = db.cursor()
+                # Update the settings in the database
+                self.update_database(cursor, db)
+                # Fetch and print the updated values
+                cursor.execute("SELECT * FROM settings WHERE id = 1;")
+                updated_values = cursor.fetchone()
+                # Update the user_settings dictionary
+                self.update_user_settings(updated_values)
+            
+            self.refresh_ui()
+            self.popup(self.root, "Settings applied successfully!")
+            self.on_close()
+        except Exception as e:
+            self.popup(self.root, f"Error applying settings: {str(e)}")
 
     def refresh_ui(self):
         # Set New Appearance Mode
@@ -945,8 +1116,7 @@ class Settings(CredentialManager):
         text_type.configure(family=user_settings["font_family"], size=user_settings["text_size"])
         subtitle_type.configure(family=user_settings["font_family"],
                                size=user_settings["text_size"] + 2)
-        title_type.configure(family=user_settings["font_family"], size=user_settings["text_size"]
-                            + 4)
+        title_type.configure(family=user_settings["font_family"], size=user_settings["text_size"] + 4)
         self.update_text_color()
 
     def update_database(self, cursor, db):
@@ -980,10 +1150,8 @@ class Settings(CredentialManager):
         text_color = user_settings["text_color"]
 
     def on_close(self):
-        # Reset the _instance attribute
         Settings._instance = None
-        # Destroy the current instance
-        self.root.after(50, self.root.destroy())
+        self.root.destroy()
 
     def run(self):
         self.root.mainloop()
