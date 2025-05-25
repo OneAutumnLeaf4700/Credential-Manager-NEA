@@ -727,54 +727,79 @@ class MainVault(CredentialManager):
                     # Create a frame for each row with alternating background
                     frame = ctk.CTkFrame(
                         self.scrollable_frame,
-                        fg_color="#242424" if row_idx % 2 == 0 else "#1a1a1a"
+                        fg_color="#242424" if row_idx % 2 == 0 else "#1a1a1a",
+                        height=50  # Fixed height for consistent row size
                     )
-                    frame.grid(row=row_idx, column=0, columnspan=4, sticky="ew", padx=0, pady=1)
-                    frame.grid_columnconfigure(0, weight=2)  # Website
-                    frame.grid_columnconfigure(1, weight=2)  # Username
-                    frame.grid_columnconfigure(2, weight=1)  # Password
-                    frame.grid_columnconfigure(3, weight=1)  # Actions
+                    frame.grid(row=row_idx, column=0, sticky="ew", padx=0, pady=1)
+                    frame.grid_propagate(False)  # Prevent frame from shrinking
                     
-                    # Add website
+                    # Configure column weights for consistent spacing
+                    frame.grid_columnconfigure(0, weight=3)  # Website (30%)
+                    frame.grid_columnconfigure(1, weight=3)  # Username (30%)
+                    frame.grid_columnconfigure(2, weight=2)  # Password (20%)
+                    frame.grid_columnconfigure(3, weight=2)  # Actions (20%)
+                    
+                    # Website column
                     website_label = ctk.CTkLabel(
                         frame,
                         text=row[1],  # Website
                         font=text_type,
-                        text_color=text_color
+                        text_color=text_color,
+                        anchor="w"
                     )
-                    website_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+                    website_label.grid(row=0, column=0, sticky="ew", padx=(20, 10), pady=5)
                     
-                    # Add username
+                    # Username column
                     username_label = ctk.CTkLabel(
                         frame,
                         text=row[2],  # Username
                         font=text_type,
-                        text_color=text_color
+                        text_color=text_color,
+                        anchor="w"
                     )
-                    username_label.grid(row=0, column=1, padx=20, pady=10, sticky="w")
+                    username_label.grid(row=0, column=1, sticky="ew", padx=10, pady=5)
                     
-                    # Add password (masked)
+                    # Password column with show/hide functionality
+                    password_var = ctk.StringVar(value="••••••••")
                     password_label = ctk.CTkLabel(
                         frame,
-                        text="••••••••",
+                        textvariable=password_var,
                         font=text_type,
+                        text_color=text_color,
+                        anchor="w"
+                    )
+                    password_label.grid(row=0, column=2, sticky="ew", padx=10, pady=5)
+                    
+                    show_password_btn = ctk.CTkButton(
+                        frame,
+                        text="👁",
+                        width=30,
+                        height=25,
+                        command=lambda p=row[3], v=password_var: self.toggle_password_visibility(p, v),
+                        font=text_type,
+                        fg_color=button_fg_color,
                         text_color=text_color
                     )
-                    password_label.grid(row=0, column=2, padx=20, pady=10, sticky="w")
+                    show_password_btn.grid(row=0, column=2, sticky="e", padx=(0, 10), pady=5)
                     
-                    # Create actions frame
+                    # Actions column
                     actions_frame = ctk.CTkFrame(frame, fg_color="transparent")
-                    actions_frame.grid(row=0, column=3, padx=20, pady=10, sticky="e")
+                    actions_frame.grid(row=0, column=3, sticky="e", padx=(10, 20), pady=5)
                     
-                    # Add action buttons
+                    # Action buttons with consistent sizing
+                    button_style = {
+                        "font": text_type,
+                        "fg_color": button_fg_color,
+                        "text_color": text_color,
+                        "height": 25  # Smaller height for better alignment
+                    }
+                    
                     edit_button = ctk.CTkButton(
                         actions_frame,
                         text="Edit",
                         width=60,
                         command=lambda r=row: self.edit_credential(r),
-                        font=text_type,
-                        fg_color=button_fg_color,
-                        text_color=text_color
+                        **button_style
                     )
                     edit_button.pack(side="left", padx=5)
                     
@@ -783,9 +808,7 @@ class MainVault(CredentialManager):
                         text="Delete",
                         width=60,
                         command=lambda r=row: self.delete_record(r[0], database, table),
-                        font=text_type,
-                        fg_color=button_fg_color,
-                        text_color=text_color
+                        **button_style
                     )
                     delete_button.pack(side="left", padx=5)
                     
@@ -793,26 +816,43 @@ class MainVault(CredentialManager):
                         favorite_button = ctk.CTkButton(
                             actions_frame,
                             text="★",
-                            width=40,
+                            width=35,
                             command=lambda r=row: self.favorite_record(r),
-                            font=text_type,
-                            fg_color=button_fg_color,
-                            text_color=text_color
+                            **button_style
                         )
                         favorite_button.pack(side="left", padx=5)
         
         except Exception as e:
+            print(f"Error in load_credentials: {e}")
             self.popup(self.root, f"Error loading credentials: {str(e)}")
 
     def favorite_record(self, record_array):
-        # Add record to favorites database
-        with sqlite3.connect(FAVOURITES_DB) as db:
-            cursor = db.cursor()
-            cursor.execute("INSERT INTO favourites (title, username, password, website, notes) VALUES (?, ?, ?, ?, ?)",
-                         (record_array[1], record_array[2], record_array[3], record_array[4], record_array[5]))
-            db.commit()
-        self.popup(self.root, "Added to Favorites")
-    
+        try:
+            # Check if record already exists in favorites
+            with sqlite3.connect(FAVOURITES_DB) as db:
+                cursor = db.cursor()
+                cursor.execute("""
+                    SELECT COUNT(*) FROM favourites 
+                    WHERE website = ? AND username = ? AND password = ?
+                """, (record_array[1], record_array[2], record_array[3]))
+                exists = cursor.fetchone()[0] > 0
+                
+                if exists:
+                    self.popup(self.root, "This credential is already in favorites")
+                    return
+                
+                # If not in favorites, add it
+                cursor.execute("""
+                    INSERT INTO favourites (title, username, password, website, notes) 
+                    VALUES (?, ?, ?, ?, ?)
+                """, (record_array[1], record_array[2], record_array[3], record_array[4], record_array[5]))
+                db.commit()
+                self.popup(self.root, "Added to Favorites")
+                
+        except Exception as e:
+            print(f"Error in favorite_record: {e}")
+            self.popup(self.root, f"Error adding to favorites: {str(e)}")
+
     def delete_record(self, row_value, database, table):
         # Determine which database to use
         db_path = ALL_ITEMS_DB if database == "AllItems" else FAVOURITES_DB
@@ -851,9 +891,9 @@ class MainVault(CredentialManager):
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         
-        # Set window size to 80% of screen size
-        self.root_width = int(screen_width * 0.8)
-        self.root_height = int(screen_height * 0.8)
+        # Set window size to 90% of screen size
+        self.root_width = int(screen_width * 0.9)
+        self.root_height = int(screen_height * 0.9)
         
         # Calculate window position for center placement
         x_position = (screen_width - self.root_width) // 2
@@ -1033,18 +1073,18 @@ class MainVault(CredentialManager):
         # Create header bar with dynamic sizing
         header_bar = ctk.CTkFrame(self.right_frame, fg_color="#242424", height=40)
         header_bar.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 10))
-        header_bar.grid_propagate(False)
+        header_bar.grid_propagate(False)  # Prevent header from shrinking
         
         # Configure header bar columns with dynamic weights
-        header_bar.grid_columnconfigure(0, weight=3)  # Website column
-        header_bar.grid_columnconfigure(1, weight=3)  # Username column
-        header_bar.grid_columnconfigure(2, weight=2)  # Password column
-        header_bar.grid_columnconfigure(3, weight=2)  # Actions column
+        header_bar.grid_columnconfigure(0, weight=3)  # Website (30%)
+        header_bar.grid_columnconfigure(1, weight=3)  # Username (30%)
+        header_bar.grid_columnconfigure(2, weight=2)  # Password (20%)
+        header_bar.grid_columnconfigure(3, weight=2)  # Actions (20%)
         
-        # Add column headers with consistent styling
+        # Add column headers with consistent styling and padding
         header_style = {"font": subtitle_type, "text_color": text_color}
         
-        # Create headers with dynamic sizing
+        # Create headers with dynamic sizing and consistent padding
         headers = [
             ("Website", lambda: self.load_credentials("website", database, table)),
             ("Username", lambda: self.load_credentials("username", database, table)),
@@ -1053,9 +1093,13 @@ class MainVault(CredentialManager):
         ]
         
         for idx, (text, command) in enumerate(headers):
+            header_frame = ctk.CTkFrame(header_bar, fg_color="transparent")
+            header_frame.grid(row=0, column=idx, sticky="ew", padx=20 if idx == 0 else (10, 20 if idx == 3 else 10))
+            header_frame.grid_columnconfigure(0, weight=1)
+            
             if command:  # Clickable header
                 header = ctk.CTkButton(
-                    header_bar,
+                    header_frame,
                     text=text,
                     fg_color="transparent",
                     border_width=0,
@@ -1064,11 +1108,11 @@ class MainVault(CredentialManager):
                 )
             else:  # Static header
                 header = ctk.CTkLabel(
-                    header_bar,
+                    header_frame,
                     text=text,
                     **header_style
                 )
-            header.grid(row=0, column=idx, padx=20, sticky="w")
+            header.grid(row=0, column=0, sticky="w")
         
         # Initialize scrollable frame
         self.initialize_scrollable_frame(database, table)
@@ -1087,7 +1131,8 @@ class MainVault(CredentialManager):
         self.canvas = ctk.CTkCanvas(
             scroll_container,
             bg="#1a1a1a",
-            highlightthickness=0
+            highlightthickness=0,
+            width=self.right_frame_width - 40  # Set initial width
         )
         self.canvas.grid(row=0, column=0, sticky="nsew")
         
@@ -1102,13 +1147,13 @@ class MainVault(CredentialManager):
         # Configure canvas
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
         
-        # Create scrollable frame
+        # Create scrollable frame with proper width
         self.scrollable_frame = ctk.CTkFrame(self.canvas, fg_color="transparent")
         self.canvas_frame = self.canvas.create_window(
             (0, 0),
             window=self.scrollable_frame,
             anchor="nw",
-            width=self.canvas.winfo_reqwidth()
+            width=self.right_frame_width - 60  # Account for scrollbar and padding
         )
         
         # Configure grid weights for scrollable frame
@@ -1236,54 +1281,79 @@ class MainVault(CredentialManager):
                     # Create a frame for each row with alternating background
                     frame = ctk.CTkFrame(
                         self.scrollable_frame,
-                        fg_color="#242424" if row_idx % 2 == 0 else "#1a1a1a"
+                        fg_color="#242424" if row_idx % 2 == 0 else "#1a1a1a",
+                        height=50  # Fixed height for consistent row size
                     )
-                    frame.grid(row=row_idx, column=0, columnspan=4, sticky="ew", padx=0, pady=1)
-                    frame.grid_columnconfigure(0, weight=2)  # Website
-                    frame.grid_columnconfigure(1, weight=2)  # Username
-                    frame.grid_columnconfigure(2, weight=1)  # Password
-                    frame.grid_columnconfigure(3, weight=1)  # Actions
+                    frame.grid(row=row_idx, column=0, sticky="ew", padx=0, pady=1)
+                    frame.grid_propagate(False)  # Prevent frame from shrinking
                     
-                    # Add website
+                    # Configure column weights for consistent spacing
+                    frame.grid_columnconfigure(0, weight=3)  # Website (30%)
+                    frame.grid_columnconfigure(1, weight=3)  # Username (30%)
+                    frame.grid_columnconfigure(2, weight=2)  # Password (20%)
+                    frame.grid_columnconfigure(3, weight=2)  # Actions (20%)
+                    
+                    # Website column
                     website_label = ctk.CTkLabel(
                         frame,
                         text=row[1],  # Website
                         font=text_type,
-                        text_color=text_color
+                        text_color=text_color,
+                        anchor="w"
                     )
-                    website_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+                    website_label.grid(row=0, column=0, sticky="ew", padx=(20, 10), pady=5)
                     
-                    # Add username
+                    # Username column
                     username_label = ctk.CTkLabel(
                         frame,
                         text=row[2],  # Username
                         font=text_type,
-                        text_color=text_color
+                        text_color=text_color,
+                        anchor="w"
                     )
-                    username_label.grid(row=0, column=1, padx=20, pady=10, sticky="w")
+                    username_label.grid(row=0, column=1, sticky="ew", padx=10, pady=5)
                     
-                    # Add password (masked)
+                    # Password column with show/hide functionality
+                    password_var = ctk.StringVar(value="••••••••")
                     password_label = ctk.CTkLabel(
                         frame,
-                        text="••••••••",
+                        textvariable=password_var,
                         font=text_type,
+                        text_color=text_color,
+                        anchor="w"
+                    )
+                    password_label.grid(row=0, column=2, sticky="ew", padx=10, pady=5)
+                    
+                    show_password_btn = ctk.CTkButton(
+                        frame,
+                        text="👁",
+                        width=30,
+                        height=25,
+                        command=lambda p=row[3], v=password_var: self.toggle_password_visibility(p, v),
+                        font=text_type,
+                        fg_color=button_fg_color,
                         text_color=text_color
                     )
-                    password_label.grid(row=0, column=2, padx=20, pady=10, sticky="w")
+                    show_password_btn.grid(row=0, column=2, sticky="e", padx=(0, 10), pady=5)
                     
-                    # Create actions frame
+                    # Actions column
                     actions_frame = ctk.CTkFrame(frame, fg_color="transparent")
-                    actions_frame.grid(row=0, column=3, padx=20, pady=10, sticky="e")
+                    actions_frame.grid(row=0, column=3, sticky="e", padx=(10, 20), pady=5)
                     
-                    # Add action buttons
+                    # Action buttons with consistent sizing
+                    button_style = {
+                        "font": text_type,
+                        "fg_color": button_fg_color,
+                        "text_color": text_color,
+                        "height": 25  # Smaller height for better alignment
+                    }
+                    
                     edit_button = ctk.CTkButton(
                         actions_frame,
                         text="Edit",
                         width=60,
                         command=lambda r=row: self.edit_credential(r),
-                        font=text_type,
-                        fg_color=button_fg_color,
-                        text_color=text_color
+                        **button_style
                     )
                     edit_button.pack(side="left", padx=5)
                     
@@ -1292,9 +1362,7 @@ class MainVault(CredentialManager):
                         text="Delete",
                         width=60,
                         command=lambda r=row: self.delete_record(r[0], database, table),
-                        font=text_type,
-                        fg_color=button_fg_color,
-                        text_color=text_color
+                        **button_style
                     )
                     delete_button.pack(side="left", padx=5)
                     
@@ -1302,11 +1370,9 @@ class MainVault(CredentialManager):
                         favorite_button = ctk.CTkButton(
                             actions_frame,
                             text="★",
-                            width=40,
+                            width=35,
                             command=lambda r=row: self.favorite_record(r),
-                            font=text_type,
-                            fg_color=button_fg_color,
-                            text_color=text_color
+                            **button_style
                         )
                         favorite_button.pack(side="left", padx=5)
         
