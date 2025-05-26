@@ -771,7 +771,7 @@ class MainVault(CredentialManager):
                     username_label.grid(row=0, column=1, sticky="ew", padx=10, pady=5)
                     
                     # Password column with show/hide functionality
-                    password_var = ctk.StringVar(value="••••••••")
+                    password_var = ctk.StringVar(value="********")
                     password_label = ctk.CTkLabel(
                         frame,
                         textvariable=password_var,
@@ -1184,6 +1184,7 @@ class MainVault(CredentialManager):
         # Create a frame for pagination controls
         pagination_frame = ctk.CTkFrame(self.right_frame, fg_color="transparent")
         pagination_frame.grid(row=3, column=0, sticky="ew", padx=20, pady=10)
+        pagination_frame.grid_columnconfigure(1, weight=1)  # Make middle column expandable
         
         # Add pagination buttons with consistent styling
         button_style = {
@@ -1199,7 +1200,16 @@ class MainVault(CredentialManager):
             command=lambda: self.change_page(-1, database, table),
             **button_style
         )
-        prev_button.pack(side="left", padx=5)
+        prev_button.grid(row=0, column=0, padx=5)
+        
+        # Add page indicator label
+        self.page_indicator = ctk.CTkLabel(
+            pagination_frame,
+            text=f"Page {self.current_page}",
+            font=text_type,
+            text_color=text_color
+        )
+        self.page_indicator.grid(row=0, column=1, padx=10)
         
         next_button = ctk.CTkButton(
             pagination_frame,
@@ -1207,7 +1217,7 @@ class MainVault(CredentialManager):
             command=lambda: self.change_page(1, database, table),
             **button_style
         )
-        next_button.pack(side="left", padx=5)
+        next_button.grid(row=0, column=2, padx=5)
 
     def on_canvas_configure(self, event):
         # Update the scroll region to encompass the inner frame
@@ -1223,6 +1233,8 @@ class MainVault(CredentialManager):
         self.current_page += direction
         if self.current_page < 1:
             self.current_page = 1
+        # Update page indicator
+        self.page_indicator.configure(text=f"Page {self.current_page}")
         # Reload credentials with new page number
         self.load_credentials("website", database, table)
 
@@ -1324,7 +1336,7 @@ class MainVault(CredentialManager):
                     username_label.grid(row=0, column=1, sticky="ew", padx=10, pady=5)
                     
                     # Password column with show/hide functionality
-                    password_var = ctk.StringVar(value="••••••••")
+                    password_var = ctk.StringVar(value="********")
                     password_label = ctk.CTkLabel(
                         frame,
                         textvariable=password_var,
@@ -1388,6 +1400,21 @@ class MainVault(CredentialManager):
         
         except Exception as e:
             self.popup(self.root, f"Error searching credentials: {str(e)}")
+
+    def toggle_password_visibility(self, encrypted_password, password_var):
+        """Toggle password visibility between asterisks and actual password."""
+        current_text = password_var.get()
+        if current_text == "********":
+            try:
+                # Decrypt and show password
+                decrypted_password = self.decrypt_password(encrypted_password)
+                password_var.set(decrypted_password)
+            except Exception as e:
+                print(f"Error decrypting password: {e}")
+                self.popup(self.root, "Error decrypting password")
+        else:
+            # Hide password
+            password_var.set("********")
 
 class RandomPasswordGenerator(CredentialManager):
     _instance = None
