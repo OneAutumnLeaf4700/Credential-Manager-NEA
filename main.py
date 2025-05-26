@@ -14,13 +14,13 @@ import time
 from tkinter import messagebox, filedialog, IntVar, StringVar
 from PIL import Image
 from cryptography.fernet import Fernet
-from database import MASTER_PASSWORD_DB, ALL_ITEMS_DB, FAVOURITES_DB, KEY_FILE, get_db_path
+from database import MASTER_PASSWORD_DB, ALL_ITEMS_DB, FAVOURITES_DB, KEY_FILE, USER_SETTINGS_DB, get_db_path
 from settings import *
 
 # Add at the top of the file, after imports
 def initialize_user_settings():
     try:
-        with sqlite3.connect("UserSettings.db") as db:
+        with sqlite3.connect(USER_SETTINGS_DB) as db:
             cursor = db.cursor()
             # Create settings table if it doesn't exist
             cursor.execute("""
@@ -243,7 +243,7 @@ class CreateMasterPassword(CredentialManager):
         main_container = ctk.CTkFrame(self.root, fg_color="#1a1a1a")
         main_container.grid(row=0, column=0, sticky="nsew", padx=40, pady=40)
         main_container.grid_columnconfigure(0, weight=1)
-        main_container.grid_rowconfigure(1, weight=1)
+        main_container.grid_rowconfigure(1, weight=1)  # Make scrollable frame expandable
         
         # Style definitions
         title_style = {"font": title_type, "text_color": text_color}
@@ -263,18 +263,23 @@ class CreateMasterPassword(CredentialManager):
             "width": 200
         }
         
-        # Create content frame
-        content_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        content_frame.grid(row=0, column=0, sticky="nsew", pady=(40, 0))
-        content_frame.grid_columnconfigure(0, weight=1)
-        
         # Title
         title = ctk.CTkLabel(
-            content_frame,
+            main_container,
             text="Create Master Password",
             **title_style
         )
-        title.grid(row=0, column=0, pady=(0, 10))
+        title.grid(row=0, column=0, pady=(0, 20))
+        
+        # Create scrollable frame
+        scroll_frame = ctk.CTkScrollableFrame(main_container, fg_color="transparent")
+        scroll_frame.grid(row=1, column=0, sticky="nsew")
+        scroll_frame.grid_columnconfigure(0, weight=1)
+        
+        # Create content frame inside scrollable frame
+        content_frame = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+        content_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 20))
+        content_frame.grid_columnconfigure(0, weight=1)
         
         # Subtitle
         subtitle = ctk.CTkLabel(
@@ -282,11 +287,11 @@ class CreateMasterPassword(CredentialManager):
             text="Create a strong master password to secure your vault",
             **subtitle_style
         )
-        subtitle.grid(row=1, column=0, pady=(0, 30))
+        subtitle.grid(row=0, column=0, pady=(0, 30))
         
         # Password requirements frame
         requirements_frame = ctk.CTkFrame(content_frame, fg_color="#242424")
-        requirements_frame.grid(row=2, column=0, pady=(0, 20), padx=20, sticky="ew")
+        requirements_frame.grid(row=1, column=0, pady=(0, 20), padx=20, sticky="ew")
         
         requirements_text = (
             "Password Requirements:\n"
@@ -305,7 +310,7 @@ class CreateMasterPassword(CredentialManager):
         
         # Entry frame
         entry_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        entry_frame.grid(row=3, column=0, pady=(0, 20))
+        entry_frame.grid(row=2, column=0, pady=(0, 20))
         
         # Password entry
         password_label = ctk.CTkLabel(
@@ -355,7 +360,7 @@ class CreateMasterPassword(CredentialManager):
             font=text_type,
             text_color="red"
         )
-        self.status_label.grid(row=4, column=0, pady=(10, 0))
+        self.status_label.grid(row=3, column=0, pady=(10, 0))
     
     def save_master_password(self):
         password = self.password_entry.get()
@@ -410,8 +415,12 @@ class CreateMasterPassword(CredentialManager):
             self.status_label.configure(text=f"Error creating password: {str(e)}")
     
     def destroy_and_create_mainvault(self):
-        app = MainVault(parent=self.root)  # Only pass parent parameter
-        app.initialize_right_frame("All Items", "AllItems", "all_items")  # Initialize with default view
+        # Create MainVault instance first
+        app = MainVault(parent=self.root)
+        app.initialize_right_frame("All Items", "AllItems", "all_items")
+        # Destroy the current window
+        self.root.destroy()
+        # Run the main vault
         app.run()
     
     def on_close(self):

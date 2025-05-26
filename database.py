@@ -6,6 +6,7 @@ import os
 MASTER_PASSWORD_DB = DB_PATHS['master_password']
 ALL_ITEMS_DB = DB_PATHS['all_items']
 FAVOURITES_DB = DB_PATHS['favourites']
+USER_SETTINGS_DB = DB_PATHS['user_settings']
 KEY_FILE = os.path.join(os.path.dirname(DB_PATHS['master_password']), 'encryption.key')
 
 def get_db_path(db_name):
