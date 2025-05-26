@@ -16,6 +16,7 @@ from PIL import Image
 from cryptography.fernet import Fernet
 from database import MASTER_PASSWORD_DB, ALL_ITEMS_DB, FAVOURITES_DB, KEY_FILE, USER_SETTINGS_DB, get_db_path
 from settings import *
+import sys  # Add this with the other imports at the top
 
 # Add at the top of the file, after imports
 def initialize_user_settings():
@@ -424,6 +425,7 @@ class CreateMasterPassword(CredentialManager):
     
     def on_close(self):
         self.root.destroy()
+        sys.exit()  # Add this to properly exit the program
     
     def run(self):
         self.root.mainloop()
@@ -598,6 +600,7 @@ class LoginScreen(CredentialManager):
     def on_close(self):
         self.cleanup_widgets()
         self.root.destroy()
+        sys.exit()  # Add this to properly exit the program
     
     def run_after_lock(self):
         self.root.mainloop()
@@ -881,6 +884,7 @@ class MainVault(CredentialManager):
     def on_close(self):
         MainVault._instance = None
         self.root.destroy()
+        sys.exit()  # Add this to properly exit the program
 
     def run(self):
         # Start the mainloop
@@ -2313,7 +2317,7 @@ class AddCredential(CredentialManager):
         main_container = ctk.CTkFrame(self.root, fg_color="#1a1a1a")
         main_container.grid(row=0, column=0, sticky="nsew", padx=40, pady=40)
         main_container.grid_columnconfigure(0, weight=1)
-        main_container.grid_rowconfigure(1, weight=1)
+        main_container.grid_rowconfigure(1, weight=1)  # Make scrollable frame expandable
         
         # Style definitions
         title_style = {"font": title_type, "text_color": text_color}
@@ -2338,9 +2342,14 @@ class AddCredential(CredentialManager):
         title = ctk.CTkLabel(main_container, text="Add New Credential", **title_style)
         title.grid(row=0, column=0, sticky="w", pady=(0, 20))
         
-        # Create content frame
-        content_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        content_frame.grid(row=1, column=0, sticky="nsew")
+        # Create scrollable frame
+        scroll_frame = ctk.CTkScrollableFrame(main_container, fg_color="transparent")
+        scroll_frame.grid(row=1, column=0, sticky="nsew")
+        scroll_frame.grid_columnconfigure(0, weight=1)
+        
+        # Create content frame inside scrollable frame
+        content_frame = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+        content_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 20))
         content_frame.grid_columnconfigure(0, weight=1)
         
         # Website
@@ -2447,9 +2456,9 @@ class AddCredential(CredentialManager):
     def run(self):
         self.root.mainloop()
 
-def run_add_credentials(self):
-    app = AddCredential(parent=self)
-    app.run()
+    def run_add_credentials(self):
+        app = AddCredential(parent=self)
+        app.run()
 
 class EditCredential(CredentialManager):
     _instance = None
