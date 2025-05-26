@@ -1,6 +1,11 @@
+#WARNING!!!
+THIS PROGRAM IS NOT INTENDED FOR USE IN PRODUCTION. IT IS A FIRST ATTEMPT AT PROGRAMMING A GUI APPLICATION IN PYTHON. I AM AWARE THAT THERE ARE MANY SECURITY VULNERABILITIES PRESENT IN THIS PROGRAM AND THUS I AM NOT RESPONSIBLE FOR ANY DAMAGE CAUSED BY USING THIS PROGRAM.
+
+
+
 # Credential Manager NEA
 
-This project is a credential manager application developed as part of my A-Level Computer Science NEA coursework. It was made during the summer of Year 12 as my first attempt at programming a software application with a GUI in Python.
+This project is a credential manager application developed as part of my A-Level Computer Science NEA coursework. It was made during the summer of Year 12 (2023) as my first attempt at programming a software application with a GUI in Python.
 
 ## Project Overview
 

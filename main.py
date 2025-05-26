@@ -198,7 +198,6 @@ class CredentialManager:
         messagebox.showinfo("Popup Message", text, parent=parent)
     
     def run_mainvault(self):
-        from main_vault import MainVault
         app = MainVault(self.root, "All Items", "AllItems", "all_items")
         app.run()
     
@@ -875,8 +874,6 @@ class MainVault(CredentialManager):
 
     def show_login_screen(self):
         # This method creates a new root window for the LoginScreen and displays it
-        import customtkinter as ctk
-        from login_screen import LoginScreen
         new_root = ctk.CTk()
         login_screen = LoginScreen(new_root)
         login_screen.run_after_lock()
