@@ -1,5 +1,4 @@
-# Final Code:
-# Main.py:
+#main.py
 import customtkinter as ctk
 import hashlib
 import string
