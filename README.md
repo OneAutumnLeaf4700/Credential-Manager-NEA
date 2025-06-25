@@ -5,7 +5,32 @@ THIS PROGRAM IS NOT INTENDED FOR USE IN PRODUCTION. IT IS A FIRST ATTEMPT AT PRO
 
 # Credential Manager NEA
 
-This project is a credential manager application developed as part of my A-Level Computer Science NEA coursework. It was made during the summer of Year 12 (2023) as my first attempt at programming a software application with a GUI in Python.
+This project is a credential manager application developed as part of my A-Level Computer Science NEA coursework. It is structured as a professional, industry-grade Python project.
+
+## Project Structure
+
+```
+Credential-Manager-NEA/
+│
+├── README.md
+├── requirements.txt
+├── LICENSE
+│
+├── src/
+│   ├── __init__.py
+│   ├── config.py
+│   ├── database.py
+│   ├── settings.py
+│   └── main.py
+│
+├── gui/
+│   └── __init__.py
+│
+├── data/
+│   └── (All .db files remain here)
+│
+└── .gitignore
+```
 
 ## Project Overview
 
@@ -24,8 +49,15 @@ I plan to recreate this program sometime in the future, with my current programm
 
 ## Getting Started
 
-To run the application, ensure you have Python installed on your system. Clone the repository and execute the `main.py` file.
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Run the application:
+   ```bash
+   python src/main.py
+   ```
 
-```bash
-python main.py
-```
+## License
+
+This project is licensed under the MIT License.
