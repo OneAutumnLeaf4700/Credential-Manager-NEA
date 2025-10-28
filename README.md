@@ -127,5 +127,3 @@ If you'd like, I can also:
 - add a short developer README with commands to run and debug the GUI
 - add a CONTRIBUTING.md template
 - add a small test harness to validate DB initialization
-
-Tell me which of the above you'd like next.
